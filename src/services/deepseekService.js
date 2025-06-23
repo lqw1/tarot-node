@@ -1,11 +1,19 @@
 const { OpenAI } = require("openai")
 const config = require("../config/deepseek")
 
-// 创建 OpenAI 实例
+// 创建 OpenAI 实例，设置超时
 const openai = new OpenAI({
   apiKey: config.apiKey,
   baseURL: "https://api.deepseek.com/v1", // DeepSeek API 的基础 URL
+  timeout: 6000000, // 60秒超时
+  maxRetries: 3,  // 最大重试次数
 })
+
+const baseMessage = [
+  { role: "system", content: "你是一个专业的塔罗牌占卜师，擅长解读塔罗牌的含义。" },
+  { role: "user", content: "你好，我想了解一下塔罗牌" },
+  { role: "assistant", content: "你好！很高兴为你介绍塔罗牌。塔罗牌是一种古老的占卜工具，由78张牌组成，包括22张大阿卡纳牌和56张小阿卡纳牌。" },
+]
 
 /**
  * 生成 AI 响应
@@ -22,9 +30,7 @@ async function generateResponse(prompt) {
     const completion = await openai.chat.completions.create({
       model: config.model,
       messages: [
-        { role: "system", content: "你是一个专业的塔罗牌占卜师，擅长解读塔罗牌的含义。" },
-        { role: "user", content: "你好，我想了解一下塔罗牌" },
-        { role: "assistant", content: "你好！很高兴为你介绍塔罗牌。塔罗牌是一种古老的占卜工具，由78张牌组成，包括22张大阿卡纳牌和56张小阿卡纳牌。" },
+        ...baseMessage,
         {
           role: "user",
           content: prompt,
@@ -60,7 +66,7 @@ async function generateResponse(prompt) {
 }
 
 /**
- * 生成流式 AI 响应
+ * 生成流式 AI 响应（SSE）
  * @param {string} prompt - 用户输入的提示文本
  * @returns {AsyncGenerator} - 流式响应生成器
  */
@@ -69,22 +75,21 @@ async function* generateStreamResponse(prompt) {
     const stream = await openai.chat.completions.create({
       model: config.model,
       messages: [
+        ...baseMessage,
         {
           role: "user",
           content: prompt,
         },
       ],
-      temperature: config.temperature,
-      max_tokens: config.max_tokens,
-      stream: true,
-    })
+      stream: true
+    });
 
     for await (const chunk of stream) {
-      yield chunk
+      yield chunk;
     }
   } catch (error) {
-    console.error("DeepSeek Stream API Error:", error)
-    throw new Error("Failed to generate stream response from DeepSeek")
+    console.error("DeepSeek Stream API Error:", error);
+    throw new Error("Failed to generate stream response from DeepSeek");
   }
 }
 
